@@ -1,0 +1,5 @@
+{
+  "name": "Remix: I AM RAKIB",
+  "description": "A long-form Text-to-Speech tool optimized for generating hours of Bengali audio by chunking text into manageable segments using Gemini 2.5.",
+  "requestFramePermissions": []
+}
