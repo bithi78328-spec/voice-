@@ -103,7 +103,7 @@ export const generateSpeechSegment = async (
           const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
 
           if (!base64Audio) {
-            throw new Error(`No audio data received from ${currentModel}.`);
+            throw new Error(`No audio data received from ${currentModel}. This usually happens if the content is filtered or the model is overloaded.`);
           }
 
           // Convert Base64 to Blob
@@ -132,24 +132,21 @@ export const generateSpeechSegment = async (
             break; // Break inner loop to try next key
           }
 
-          // For other retryable errors, try next model with same key
-          const isModelRetryable = 
-            errorMessage.includes("503") || 
-            errorMessage.includes("not found") || 
-            errorMessage.includes("unsupported") || 
-            errorMessage.includes("invalid model") || 
-            errorMessage.includes("blocked") || 
-            errorMessage.includes("safety") || 
-            errorMessage.includes("internal error") || 
-            errorMessage.includes("deadline") || 
-            errorMessage.includes("unavailable");
+          // For other errors, try next model with same key
+          // We are now more aggressive: any error that isn't an invalid key error will trigger a model fallback
+          const isInvalidKey = 
+            errorMessage.includes("api key not valid") || 
+            errorMessage.includes("invalid api key") ||
+            errorMessage.includes("key not found");
 
-          if (isModelRetryable) {
+          if (!isInvalidKey) {
             console.warn(`[Key ${keyIndex + 1}] Model ${currentModel} failed: ${error.message}. Trying next model...`);
+            // Small delay to let the API breathe
+            await new Promise(resolve => setTimeout(resolve, 500));
             continue; // Try next model in inner loop
           } else {
             // For critical errors like "Invalid API Key", skip this key
-            console.error(`[Key ${keyIndex + 1}] Critical error: ${error.message}. Skipping key...`);
+            console.error(`[Key ${keyIndex + 1}] Critical key error: ${error.message}. Skipping key...`);
             break; // Break inner loop to try next key
           }
         }
