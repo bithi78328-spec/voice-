@@ -120,28 +120,36 @@ export const generateSpeechSegment = async (
           lastError = error;
           const errorMessage = (error.message || "").toLowerCase();
           
-          // Determine if we should try the next model or next key
-          const isRetryable = 
+          // If it's a quota or rate limit error, skip this KEY entirely for all models
+          const isQuotaError = 
+            errorMessage.includes("quota") || 
             errorMessage.includes("429") || 
-            errorMessage.includes("503") || 
-            errorMessage.includes("quota") ||
             errorMessage.includes("rate limit") ||
-            errorMessage.includes("not found") ||
-            errorMessage.includes("unsupported") ||
-            errorMessage.includes("invalid model") ||
-            errorMessage.includes("blocked") ||
-            errorMessage.includes("safety") ||
-            errorMessage.includes("internal error") ||
-            errorMessage.includes("deadline") ||
+            errorMessage.includes("limit exceeded");
+
+          if (isQuotaError) {
+            console.warn(`[Key ${keyIndex + 1}] Quota exceeded or rate limited. Skipping this key entirely...`);
+            break; // Break inner loop to try next key
+          }
+
+          // For other retryable errors, try next model with same key
+          const isModelRetryable = 
+            errorMessage.includes("503") || 
+            errorMessage.includes("not found") || 
+            errorMessage.includes("unsupported") || 
+            errorMessage.includes("invalid model") || 
+            errorMessage.includes("blocked") || 
+            errorMessage.includes("safety") || 
+            errorMessage.includes("internal error") || 
+            errorMessage.includes("deadline") || 
             errorMessage.includes("unavailable");
 
-          if (isRetryable) {
-            console.warn(`[Key ${keyIndex + 1}] Model ${currentModel} failed: ${error.message}. Trying next...`);
-            // Continue to next model in inner loop
-            continue;
+          if (isModelRetryable) {
+            console.warn(`[Key ${keyIndex + 1}] Model ${currentModel} failed: ${error.message}. Trying next model...`);
+            continue; // Try next model in inner loop
           } else {
-            // For critical errors like "Invalid API Key", we should probably skip this key entirely
-            console.error(`[Key ${keyIndex + 1}] Critical error with key: ${error.message}. Skipping to next key...`);
+            // For critical errors like "Invalid API Key", skip this key
+            console.error(`[Key ${keyIndex + 1}] Critical error: ${error.message}. Skipping key...`);
             break; // Break inner loop to try next key
           }
         }
